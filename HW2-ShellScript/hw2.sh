@@ -15,34 +15,47 @@ show_syntax() {
 
 decode_data() {
     while IFS= read -r name; do
+        IFS= read -r type
         IFS= read -r data
         IFS= read -r md5
         IFS= read -r sha1
-        data=$(echo "$data" | openssl base64 -d)
-        # data_length=${#data}
-        data_length=$(echo "$data" | wc -c | awk '{print $1}')
-        # printf "bbbb${data_length}bbbb"
+        data=$(echo "$data" | openssl base64 -d -A)
 
-        computed_md5=$(echo "$data" | md5)
-        computed_sha1=$(echo "$data" | sha1)
+        # do it recursively
+        if [ "$type" = "hw2" ]; then
+            mkdir -p "$output_file/$(dirname "$name")"
+            echo "$data" > "$output_file/$name"
+            loc_datas=$(yq -r '.files[] | .name, .type, .data, .hash.md5, .hash["sha-1"]' "$output_file/$name")
+            echo "$loc_datas" >> "test.txt"
+            echo "" >> "test.txt"
+            mismatch_count=$((mismatch_count + $(echo "$loc_datas" | decode_data)))
+        elif [ "$type" = "file" ]; then
 
-        if [ "$md5" != "$computed_md5" ] || [ "$sha1" != "$computed_sha1" ]; then
-            mismatch_count=$((mismatch_count + 1))
-            # echo "Mismatched checksums: $mismatch_count"
-        fi
+            # data_length=${#data}
+            data_length=$(echo "$data" | wc -c | awk '{print $1}')
+            # printf "bbbb${data_length}bbbb"
 
-        if [ $files_output ] && [ "$format" = "csv" ]; then
-            echo "${name},${data_length},$md5,$sha1" >> "$output_file/$csv_file"
-            # echo "" >> "$output_file/$csv_file"
-        elif [ $files_output ] && [ "$format" = "tsv" ]; then
-            printf '%s\t%s\t%s\t%s' "$name" "$data_length" "$md5" "$sha1" >> "$output_file/$tsv_file"
-            echo "" >> "$output_file/$tsv_file"
-        fi
+            computed_md5=$(echo "$data" | md5)
+            computed_sha1=$(echo "$data" | sha1)
+
+            if [ "$md5" != "$computed_md5" ] || [ "$sha1" != "$computed_sha1" ]; then
+                mismatch_count=$((mismatch_count + 1))
+                # echo "Mismatched checksums: $mismatch_count"
+            fi
+
+            if [ $files_output ] && [ "$format" = "csv" ]; then
+                echo "${name},${data_length},$md5,$sha1" >> "$output_file/$csv_file"
+                # echo "" >> "$output_file/$csv_file"
+            elif [ $files_output ] && [ "$format" = "tsv" ]; then
+                printf '%s\t%s\t%s\t%s' "$name" "$data_length" "$md5" "$sha1" >> "$output_file/$tsv_file"
+                echo "" >> "$output_file/$tsv_file"
+            fi
 
             mkdir -p "$output_file/$(dirname "$name")"
             echo "$data" > "$output_file/$name"
+        fi
     done
-    echo "$mismatch_count"
+    echo $mismatch_count
 }
 
 # Parse command-line arguments
@@ -116,12 +129,12 @@ if $json_output; then
 fi
 
 mismatch_count=0
-datas=$(yq -r '.files[] | .name, .data, .hash.md5, .hash["sha-1"]' "$input_file")
+datas=$(yq -r '.files[] | .name, .type, .data, .hash.md5, .hash["sha-1"]' "$input_file")
 mismatch_count=$(echo "$datas" | decode_data)
 
 
 # echo "Mismatched checksums: $mismatch_count"
-exit $mismatch_count
+exit "$mismatch_count"
 
 
 
