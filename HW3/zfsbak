@@ -1,0 +1,115 @@
+#!/usr/local/bin/bash
+
+# LOG_FILE="/usr/local/bin/output.log"
+
+help(){
+	echo "Usage:"
+	echo "- create: zfsbak DATASET [ROTATION_CNT]"
+	echo "- list: zfsbak -l|--list [DATASET|ID|DATASET ID...]"
+	echo "- delete: zfsbak -d|--delete [DATASET|ID|DATASET ID...]"
+	echo "- export: zfsbak -e|--export DATASET [ID]"
+	echo "- import: zfsbak -i|--import FILENAME DATASET"
+}
+
+getlist(){
+	DATASET=${1:-"mypool"}
+	readarray -t list <<<`zfs list -H -o name -t snapshot $snap -s creation \
+	| grep $DATASET | nl | sed "s:@: :g"`
+}
+printlist(){
+	[ -z $1 ] || { echo ${list[$(($1 - 1))]} | awk '{gsub(" ","\t",$0);print;}'; return 0; }
+	local END=${#list[@]}
+	local i
+	for (( i=0 ; i<$END ; i++ )); do
+		[ -z ${list[$i]} ] 2>/dev/null && return 0 
+		echo ${list[$i]} | awk '{gsub(" ","\t",$0); print;}'
+	done
+}
+create_snapshot() {
+    local dataset="$1"
+    local rotation_count="$2"
+    local create_time=$(date +"%Y-%m-%d-%H:%M:%S")
+    local snapshot_name="zfsbak_${create_time}"
+
+    local snapshots=($(zfs list -t snapshot -o name -H | grep "^${dataset}@zfsbak_" | sort))
+
+    while [ ${#snapshots[@]} -ge "$rotation_count" ]; do
+        local oldest_snapshot=${snapshots[0]}
+        zfs destroy "$oldest_snapshot"
+        echo "Destroy $oldest_snapshot"
+        snapshots=("${snapshots[@]:1}")  # Remove the first element from the array
+    done
+
+    # Create the snapshot
+    zfs snapshot -r "${dataset}@${snapshot_name}"
+    echo "Snap ${dataset}@zfsbak_${create_time}"
+}
+delete_snapshot() {
+    local dataset="$1"
+    shift
+    local ids=("$@")
+    if [ -n "$dataset" ] && [ ${#ids[@]} -gt 0 ]; then
+        getlist $dataset
+        for id in "${ids[@]}"; do
+            
+            local snapshot_name=$(echo "${list[$(($id - 1))]}" | awk '{print $3}')
+            zfs destroy "${dataset}@${snapshot_name}"
+            echo "Destroy ${dataset}@${snapshot_name}"
+        done
+    elif [ -n "$dataset" ]; then
+        zfs list -H -o name -t snapshot | grep "^${dataset}@zfsbak_" | while read -r snapshot; do
+            zfs destroy "$snapshot"
+            echo "Destroy $snapshot"
+        done
+    elif [ ${#ids[@]} -gt 0 ]; then
+        getlist
+        for id in "${ids[@]}"; do
+            
+            local snapshot_info=$(echo "${list[$(($id - 1))]}")
+            local snapshot_name=$(echo $snapshot_info | awk '{print $3}')
+            local deleted_dataset=$(echo $snapshot_info | awk '{print $2}')
+            zfs destroy "$deleted_dataset@$snapshot_name"
+            echo "Destroy $deleted_dataset@$snapshot_name"
+        done
+    else
+        zfs list -H -o name -t snapshot | grep "@zfsbak_" | while read -r snapshot; do
+            zfs destroy "$snapshot"
+            echo "Destroy $snapshot"
+        done
+    fi
+}
+if [ $# -eq 0 ]; then
+    help
+    exit 1
+fi
+
+case "$1" in
+	-h | --help )
+		help
+		exit 1
+		;;
+	-l | --list )
+		echo -e "ID\tDATASET\t\tTIME"
+		if [ -n $2 ] && [ $2 -eq $2 ] 2>/dev/null; then
+			getlist
+			printlist $2
+		else
+			getlist $2
+			printlist $3
+		fi
+		;;
+    -d | --delete )
+        if zfs list -H -o name "$2" > /dev/null 2>&1; then
+            dataset="$2"
+            shift 2
+        else
+            shift
+        fi
+        delete_snapshot "$dataset" "$@"
+        ;;
+    * )
+        dataset="$1"
+        rotation_count="${2:-12}"
+        create_snapshot "$dataset" "$rotation_count"
+        ;;
+esac
