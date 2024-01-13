@@ -1,0 +1,171 @@
+{
+	"logging": {
+		"logs": {
+			"default": {
+				"exclude": [
+					"http.log.access.log0",
+                    "http.log.access.log1"
+				]
+			},
+			"log0": {
+                "writer": {
+                    "filename": "/home/judge/log/access.log",
+                    "output": "file"
+                },
+                "encoder": {
+                    "format": "json",
+                    "wrap": "single_field",
+                    "field_name": "log",
+                    "template": "{{.RemoteIP}} - {{.User}} [{{.Timestamp}}] \"{{.Method}} {{.URI}} {{.Proto}}\" {{.Status}} {{.Size}} \"{{.Referer}}\" \"{{.UserAgent}}\""
+                },
+                "include": [
+                    "http.log.access.log0"
+                ]
+            },
+            "log1": {
+                "writer": {
+                    "filename": "/home/judge/log/compressed.log.gz",
+                    "output": "file",
+                    "roll": true,
+                    "roll_size_mb": 10,
+                    "roll_gzip": true,
+                    "roll_keep": 5,
+                    "roll_keep_days": 30
+                },
+                "encoder": {
+                    "format": "json",
+                    "wrap": "single_field",
+                    "field_name": "log",
+                    "template": "{{.RemoteIP}} | {{.Method}} {{.URI}} | {{.UserAgent}} is my Agent Info."
+                },
+                "include": [
+                    "http.log.access.log1"
+                ]
+            }
+		}
+	},
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						":443"
+					],
+					"routes": [
+						{
+							"match": [
+								{
+									"host": [
+										"localhost"
+									]
+								}
+							],
+							"handle": [
+								{
+									"handler": "subroute",
+									"routes": [
+										{
+											"handle": [
+												{
+													"handler": "vars",
+													"root": "/usr/local/www/caddy"
+												},
+												{
+													"handler": "file_server",
+													"hide": [
+														"/usr/local/etc/caddy/Caddyfile"
+													]
+												}
+											]
+										}
+									]
+								}
+							],
+							"terminal": true
+						}
+					],
+					"logs": {
+						"logger_names": {
+							"localhost": "log0"
+						}
+					}
+				},
+				"srv1": {
+					"listen": [
+						":80"
+					],
+					"routes": [
+						{
+							"match": [
+								{
+									"host": [
+										"10.113.155.11"
+									]
+								}
+							],
+							"handle": [
+								{
+									"handler": "subroute",
+									"routes": [
+										{
+											"handle": [
+												{
+													"handler": "vars",
+													"root": "/home/judge/www/10.113.155.11"
+												},
+												{
+													"handler": "file_server",
+													"hide": [
+														"/usr/local/etc/caddy/Caddyfile"
+													]
+												}
+											]
+										}
+									]
+								}
+							],
+							"terminal": true
+						},
+						{
+							"match": [
+								{
+									"host": [
+										"155.cs.nycu"
+									]
+								}
+							],
+							"handle": [
+								{
+									"handler": "subroute",
+									"routes": [
+										{
+											"handle": [
+												{
+													"handler": "vars",
+													"root": "/home/judge/www/155.cs.nycu"
+												},
+												{
+													"handler": "file_server",
+													"hide": [
+														"/usr/local/etc/caddy/Caddyfile"
+													]
+												}
+											]
+										}
+									]
+								}
+							],
+							"terminal": true
+						}
+					],
+                    "logs":{
+                        "logger_names":{
+                           "10.113.155.11":"log1",
+                           "155.cs.nycu":"log1"
+                        }
+                    }
+				}
+			}
+		}
+	}
+}

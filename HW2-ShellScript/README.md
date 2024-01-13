@@ -1,0 +1,1 @@
+This assignment need us to extract information and decode content from the input file using shellscript. The sample input files are listed in `/sample` directory. Since this assignment is more about programming and less about environmental setup, I simply add some comments to show what i have done.
