@@ -1,17 +1,16 @@
-# SA - hw
+# SA - hw3
 ### file server
-```
+```bash
 $ sudo chown sysadm:sftp /home/sftp/public
 $ sudo chown sysadm:sftp /home/sftp/hidden
 $ sudo chmod 3775 /home/sftp/public
 $ sudo chmod 771 /home/sftp/hidden
 ```
 
-
 ### add new hard disks & raid10 pool, zfs service and datasets
 1. create new hard disk: vm shutdown -> add new hard disk
 2. check your disks:
-```
+```sh
 $ sudo camcontrol devlist
 ```
 ![Alt text](image.png)
@@ -61,4 +60,4 @@ sudo zfs set compression=lz4 atime=off mypool/public
 sudo zfs set compression=lz4 atime=off mypool/hidden
 ```
 
-8. automatic snapshoot script: zfsbak
+8. automatic snapshoot script: [zfsbak](https://github.com/chuchunchi/Computer-System-Administration/blob/main/HW3/zfsbak)
