@@ -21,7 +21,7 @@ decode_data() {
         IFS= read -r sha1
         data=$(echo "$data" | openssl base64 -d -A)
 
-        # do it recursively
+        # do it recursively if type is hw2
         if [ "$type" = "hw2" ]; then
             mkdir -p "$output_file/$(dirname "$name")"
             echo "$data" > "$output_file/$name"
@@ -102,14 +102,15 @@ if [ ! -f "$input_file" ]; then
     exit 1
 fi
 
-
-
-
-# mkdir output
+# Remove existing output directory
 rm -r "$output_file"
+
+# Create the output directory
 if [ ! -d "$output_file" ]; then
     mkdir -p "$output_file"
 fi
+
+# Create CSV or TSV file if files_output is true
 if [ $files_output ]; then
     csv_file="files.csv"
     tsv_file="files.tsv"
@@ -119,6 +120,8 @@ if [ $files_output ]; then
         printf "filename\tsize\tmd5\tsha1\n" > "$output_file/$tsv_file"
     fi
 fi
+
+# Create info.json file if json_output is true
 if $json_output; then
     name=$(grep "name" "$input_file")
     json_file="info.json"
@@ -132,9 +135,5 @@ mismatch_count=0
 datas=$(yq -r '.files[] | .name, .type, .data, .hash.md5, .hash["sha-1"]' "$input_file")
 mismatch_count=$(echo "$datas" | decode_data)
 
-
 # echo "Mismatched checksums: $mismatch_count"
 exit "$mismatch_count"
-
-
-
